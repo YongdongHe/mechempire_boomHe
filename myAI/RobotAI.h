@@ -9,9 +9,10 @@ class RobotAI:public RobotAI_Interface
 protected:
 	//TODO:可以在这里添加你自己的成员变量
 	int MyCar = 0;
+	const int color = 255;
 	enum{
-		AFV_Esaw ,
-		AFV_Prism ,
+		AFV_Esaw,
+		AFV_Prism,
 		AFV_WT_Machinegun
 	};
 public:
@@ -139,7 +140,7 @@ public:
 	/*对每个机甲适应的部分>>>>>>>*/
 
 
-	bool WillHit(const RobotAI_BulletInformation& bullet, const RobotAI_RobotInformation& rotinfo);//将会击中自己的子弹数
+	bool WillHit(const RobotAI_BulletInformation& bullet, const RobotAI_RobotInformation& rotinfo);
 	double abvalue(double x);
 	double pointdis(const Circle a1, const Circle a2, const Circle a3);
 	double pointdis(double x1, double y1, double x2, double y2, double x3, double y3); 

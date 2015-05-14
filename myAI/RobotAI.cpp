@@ -1,5 +1,6 @@
 ﻿#include "RobotAI.h"
 #include<iostream>
+
 RobotAI::RobotAI()
 {
 	
@@ -16,7 +17,7 @@ RobotAI::~RobotAI()
 //-----------------------------------------------------
 //1.必须完成的战斗核心
 //-----------------------------------------------------
-
+static int frame = 0;
 
 void RobotAI::Update(RobotAI_Order& order,const RobotAI_BattlefieldInformation& info,int myID)
 {
@@ -30,13 +31,12 @@ void RobotAI::Update(RobotAI_Order& order,const RobotAI_BattlefieldInformation& 
 	auto me = info.robotInformation[myID];
 	auto tag = info.robotInformation[1 - myID];
 	/*静态成员列表*/
-	static int frame = 0;
+	
 	static int hp_tag = tag.hp;
 	/*静态成员列表*/
-
-
+	
+	
 	//开火操作
-	//cout << "*******************当前帧数" << frame << endl;
     if (frame != 0)
 	{
 			onFire1(order, info, myID);
@@ -51,20 +51,16 @@ void RobotAI::Update(RobotAI_Order& order,const RobotAI_BattlefieldInformation& 
 	if (b_index_nearest != -1)//如果有敌方子弹则进行躲避判断
 	{
 		auto bullet = info.bulletInformation[b_index_nearest];
-		if (dis(bullet.circle, me.circle) <= 0.6 * me.circle.r *getBulletSpeed(bullet.type))//判断在监控范围内再躲
-		{
-			isDodge = onDodge(order, info, myID, bullet);
-		}
+        isDodge = onDodge(order, info, myID, bullet);
+
 	}
-	
-	
+
 	//正常移动操作
 	//isDodge = false;
 	if (!isDodge)
 	{
 		onMove1(order, info, myID, tag.circle);
 	}
-
 	//静态变量更新
 	hp_tag = tag.hp;
 	frame++;
@@ -121,7 +117,7 @@ void RobotAI::ChooseArmor(weapontypename& weapon,enginetypename& engine,bool a)
 string RobotAI::GetName()
 {
 	//返回你的机甲的名字
-	return "叫我粗粮";
+	return "艾欧尼亚闪电";
 }
 
 string RobotAI::GetAuthor()
@@ -138,17 +134,17 @@ string RobotAI::GetAuthor()
 int RobotAI::GetWeaponRed()
 {
 	//返回一个-255-255之间的整数,代表武器红色的偏移值
-	return 0;
+	return color;
 }
 int RobotAI::GetWeaponGreen()
 {
 	//返回一个-255-255之间的整数,代表武器绿色的偏移值
-	return 0;
+	return color;
 }
 int RobotAI::GetWeaponBlue()
 {
 	//返回一个-255-255之间的整数,代表武器蓝色的偏移值
-	return 0;
+	return color;
 }
 
 
@@ -158,17 +154,17 @@ int RobotAI::GetWeaponBlue()
 int RobotAI::GetEngineRed()
 {
 	//返回一个-255-255之间的数,代表载具红色的偏移值
-	return 0;
+	return color;
 }
 int RobotAI::GetEngineGreen()
 {
 	//返回一个-255-255之间的整数,代表载具绿色的偏移值
-	return 0;
+	return color;
 }
 int RobotAI::GetEngineBlue()
 {
 	//返回一个-255-255之间的整数,代表载具蓝色的偏移值
-	return 0;
+	return color;
 }
 
 
@@ -370,8 +366,6 @@ void RobotAI::onFire1(RobotAI_Order& order, const RobotAI_BattlefieldInformation
 		if (
 			!HaveBarrier(info, myID, 0) &&
 			!HaveBarrier(info, myID, 1) &&
-			(onTagRota(info, myID)<3) &&
-			(onTagRota(info, myID)>-3) &&
 			dis(me.circle, tag.circle)<95 + tag.circle.r
 			)
 			order.fire = 1;				
@@ -394,44 +388,61 @@ void RobotAI::onFire1(RobotAI_Order& order, const RobotAI_BattlefieldInformation
 
 bool  RobotAI::onDodge(RobotAI_Order& order, const RobotAI_BattlefieldInformation& info, const int myID,const  RobotAI_BulletInformation& bullet)
 //躲闪函数，如果发出了躲避命令，则返回true;
-{	
+{		
 	auto me = info.robotInformation[myID];
+	auto tag = info.robotInformation[1-myID];
+	bool inHitRange = dis(bullet.circle, me.circle) <= 0.6 * me.circle.r *getBulletSpeed(bullet.type);//判断在监控范围内再躲
 	double Rota_bulv = atan2(bullet.vy, bullet.vx) * 180 / PI;//子弹速度方向
-	double Rota_bulv_ag = Rota_bulv - Rota_bulv / abvalue(Rota_bulv) * 180;//子弹速度反方向
+	double Rota_bulv_ag = Rota_bulv - 180;//子弹速度反方向
+	AngleAdjust(Rota_bulv_ag);
 	auto Type_Bul = bullet.type;
+
 	switch (MyCar)
 	{
 	case AFV_Esaw:
 		if (order.fire == 1)
 			return false;
-	case AFV_Prism:
-	case AFV_WT_Machinegun:	
-	default:
 		switch (Type_Bul)
 		{
 		case BT_ShotgunBall:
-		case BT_MachinegunBall:	
-		case BT_Mine:
-			if (!WillHit(bullet, me))
-			{
-				order.run = 0;
-				return true;
-			}
+		case BT_MachinegunBall:
 			order.eturn = 1;
 			order.run = 1;
 			return true;
+			break;
 		case BT_Cannonball:
 		case BT_ApolloBall:
+		case BT_PlasmaBall:
+			if (tag.remainingAmmo <= 8)
+			{
+				onMove1(order, info, myID, tag.circle );
+				return true;
+			}
+			if (!inHitRange)return false;
+				order.eturn = 1;
+				order.run = 1;
+				return true;		
+			break;
 		default:
+			if (!inHitRange)
+			{
+				return false;
+			}
 			if (me.engineRotation >= Rota_bulv_ag)
 				order.eturn = -1;
 			else
 				order.eturn = 1;
 			order.run = 1;
 			return true;
-		}		
+			break;
+		}
+		break;
+		/*…………………………………………………………*/
+	case AFV_Prism:
+	case AFV_WT_Machinegun:
+		break;
+		return false;
 	}
-	return false;
 }
 
 bool RobotAI::WillHit(const RobotAI_BulletInformation& bullet, const RobotAI_RobotInformation& rotinfo)
