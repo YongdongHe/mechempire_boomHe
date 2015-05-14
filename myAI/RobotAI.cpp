@@ -413,7 +413,7 @@ bool  RobotAI::onDodge(RobotAI_Order& order, const RobotAI_BattlefieldInformatio
 		case BT_Cannonball:
 		case BT_ApolloBall:
 		case BT_PlasmaBall:
-			if (tag.remainingAmmo <= 8)
+			if ((tag.remainingAmmo + 2)*getBulletDamage(bullet.type) < me.hp)
 			{
 				onMove1(order, info, myID, tag.circle );
 				return true;
