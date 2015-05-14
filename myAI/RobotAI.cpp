@@ -31,48 +31,42 @@ void RobotAI::Update(RobotAI_Order& order,const RobotAI_BattlefieldInformation& 
 	auto tag = info.robotInformation[1 - myID];
 	/*静态成员列表*/
 	static int frame = 0;
+	static int hp_tag = tag.hp;
 	/*静态成员列表*/
-	//cout << "当前帧数" << frame << endl;
+
+
+	//开火操作
+	//cout << "*******************当前帧数" << frame << endl;
     if (frame != 0)
 	{
 			onFire1(order, info, myID);
 	}
 	onTag1(order, info, myID);
+
+	//躲避操纵
+	//isDodeg——判断是否执行躲避函数，如果执行则为true，将跳过后面的移动函数优先躲避
+	//bullet ——最近的子弹
 	bool isDodge = false;
-	//cout << "地图上子弹数量" << info.num_bullet << endl;
-	for (int b_index = 0; b_index < info.num_bullet; b_index++)
+	int b_index_nearest = GetNearetBul(order, info, myID);
+	if (b_index_nearest != -1)//如果有敌方子弹则进行躲避判断
 	{
-		auto bullet = info.bulletInformation[b_index];
-		if (bullet.launcherID == myID)
+		auto bullet = info.bulletInformation[b_index_nearest];
+		if (dis(bullet.circle, me.circle) <= 0.6 * me.circle.r *getBulletSpeed(bullet.type))//判断在监控范围内再躲
 		{
-			continue;
-			//cout << "第" << b_index << "子弹是我的子弹" << endl;
+			isDodge = onDodge(order, info, myID, bullet);
 		}
-			
-//		double b_speed = getBulletSpeed(bullet.type);
-		if (dis(bullet.circle, me.circle) <= 0.6 * me.circle.r *getBulletSpeed(info.bulletInformation[b_index].type))
-		{
-			//cout << b_index<<"有一颗子弹进入监控" << endl;
-			cout << "躲避函数执行" <<  getBulletSpeed( info.bulletInformation[b_index].type)<< endl;
-			isDodge = onDodge(order, info, myID, bullet);//每次只躲最先获取到信息的能击中自己的子弹
-			break;
-			//if (WillHit(bullet, me))
-			//{
-			//	cout << "躲避函数执行" << endl;
-			//	isDodge=onDodge(order, info, myID, bullet);//每次只躲最先获取到信息的能击中自己的子弹
-			//	break; 
-			//}			
-		}
-		
 	}
 	
+	
+	//正常移动操作
 	//isDodge = false;
 	if (!isDodge)
 	{
 		onMove1(order, info, myID, tag.circle);
-		//cout << "躲避函数未执行，正常移动" << endl;
-
 	}
+
+	//静态变量更新
+	hp_tag = tag.hp;
 	frame++;
 }
 
@@ -246,6 +240,30 @@ bool RobotAI::HaveBarrier(const RobotAI_BattlefieldInformation& info,const int m
 
 }
 
+int RobotAI::GetNearetBul(RobotAI_Order& order, const RobotAI_BattlefieldInformation& info, const int myID)
+{
+	auto me = info.robotInformation[myID];
+	//cout << "地图上子弹数量" << info.num_bullet + 1 << endl;
+	int b_index_near = -1;
+	int b_tag = 0;//敌方子弹数
+	for (int b_index = 0; b_index <= info.num_bullet; b_index++)
+	{
+		//cout << "判断第" << b_index << "子弹" << endl;
+		auto bullet = info.bulletInformation[b_index];
+		if (bullet.launcherID == myID)
+		{
+			continue;
+		}
+		b_tag++;
+		if (b_tag == 1)b_index_near = b_index;
+		//cout << "第" << b_index << "子弹是敌方子弹" << endl;
+		if (dis(bullet.circle, me.circle) <= dis(info.bulletInformation[b_index_near].circle, me.circle))
+			b_index_near = b_index;		
+	}
+	//cout << "最近！" << b_index_near << endl;
+	return b_index_near;//如果没有找到最近的敌方子弹就返回-1
+}
+
 
 
 void RobotAI::onTag1(RobotAI_Order& order,const RobotAI_BattlefieldInformation& info, const int myID)//瞄准函数（不带预判）
@@ -337,6 +355,18 @@ void RobotAI::onFire1(RobotAI_Order& order, const RobotAI_BattlefieldInformation
 	switch (MyCar)
 	{
 	case AFV_Esaw:
+		if (tag.weaponTypeName == WT_ElectricSaw)
+		{
+			if (
+				!HaveBarrier(info, myID, 0) &&
+				!HaveBarrier(info, myID, 1) &&
+				(onTagRota(info, myID)<3) &&
+				(onTagRota(info, myID)>-3) &&
+				dis(me.circle, tag.circle)<120 + tag.circle.r
+				)
+				order.fire = 1;
+			break;
+		}
 		if (
 			!HaveBarrier(info, myID, 0) &&
 			!HaveBarrier(info, myID, 1) &&
@@ -344,7 +374,7 @@ void RobotAI::onFire1(RobotAI_Order& order, const RobotAI_BattlefieldInformation
 			(onTagRota(info, myID)>-3) &&
 			dis(me.circle, tag.circle)<95 + tag.circle.r
 			)
-			order.fire = 1;
+			order.fire = 1;				
 		break;
 	case AFV_Prism:
 	case AFV_WT_Machinegun:
@@ -364,67 +394,79 @@ void RobotAI::onFire1(RobotAI_Order& order, const RobotAI_BattlefieldInformation
 
 bool  RobotAI::onDodge(RobotAI_Order& order, const RobotAI_BattlefieldInformation& info, const int myID,const  RobotAI_BulletInformation& bullet)
 //躲闪函数，如果发出了躲避命令，则返回true;
-{
+{	
 	auto me = info.robotInformation[myID];
-	auto tag = info.robotInformation[1-myID];
-	double bul_Rota = atan2(bullet.vy, bullet.vx) * 180 / PI;//子弹方向夹角
-	double Rota = atan2(bullet.circle.y - me.circle.y,
-		bullet.circle.x - me.circle.x) * 180 / PI;//机甲为原点，子弹和机甲中心所构成的角
-	double Rota_chan = 0;//机甲最终转向角
+	double Rota_bulv = atan2(bullet.vy, bullet.vx) * 180 / PI;//子弹速度方向
+	double Rota_bulv_ag = Rota_bulv - Rota_bulv / abvalue(Rota_bulv) * 180;//子弹速度反方向
+	auto Type_Bul = bullet.type;
 	switch (MyCar)
 	{
 	case AFV_Esaw:
+		if (order.fire == 1)
+			return false;
 	case AFV_Prism:
 	case AFV_WT_Machinegun:	
-		//cout << "子弹角度" << atan2(bullet.vy, bullet.vx) * 180 / PI << endl;
-		bul_Rota  -= 180;
-		if (bul_Rota < -180)bul_Rota += 360;
-		if (abvalue(me.engineRotation - bul_Rota) >20)
-		{
-			Rota_chan = bul_Rota;
-			onMove1(order, info, myID, Rota_chan);
-		}
-		else{
-			//Rota_chan = me.engineRotation + (me.engineRotation - bul_Rota) / abvalue(me.engineRotation - bul_Rota)*
-			//	(90 - abvalue(me.engineRotation - bul_Rota));//往偏离子弹的方向转，子弹和机甲夹角越小，该方向越大
-			//onMove1(order, info, myID, Rota_chan);
-
-		}
-		return true;
-		break;
 	default:
-		break;
+		switch (Type_Bul)
+		{
+		case BT_ShotgunBall:
+		case BT_MachinegunBall:	
+		case BT_Mine:
+			if (!WillHit(bullet, me))
+			{
+				order.run = 0;
+				return true;
+			}
+			order.eturn = 1;
+			order.run = 1;
+			return true;
+		case BT_Cannonball:
+		case BT_ApolloBall:
+		default:
+			if (me.engineRotation >= Rota_bulv_ag)
+				order.eturn = -1;
+			else
+				order.eturn = 1;
+			order.run = 1;
+			return true;
+		}		
 	}
+	return false;
 }
 
 bool RobotAI::WillHit(const RobotAI_BulletInformation& bullet, const RobotAI_RobotInformation& rotinfo)
 //判断子弹能否击中rotinfo
 {
-	double pointdis_me_bul = pointdis(
-		bullet.circle.x,
-		bullet.circle.y,
-		bullet.circle.x + bullet.vx,
-		bullet.circle.y + bullet.vy,
-		rotinfo.circle.x,
-		rotinfo.circle.y
-		);
-	double Rota = atan2(rotinfo.circle.y - bullet.circle.y, 
-		rotinfo.circle.x- bullet.circle.x) * 180 / PI;//子弹为原点，子弹和机甲中心所构成的角
-	double Rota_bul = atan2(bullet.vy-rotinfo.vx, bullet.vx-rotinfo.vy) * 180 / PI;//子弹相对机甲射击方向角
-	double dis_me_bul = sqrt(dis(bullet.circle, rotinfo.circle));
-	double Rota_hit = atan2(
-		rotinfo.circle.r,
-		sqrt(dis_me_bul*dis_me_bul - rotinfo.circle.r*rotinfo.circle.r)
-		);//能击中的角度范围
-	if (
-		pointdis_me_bul <= rotinfo.circle.r &&
-		(Rota_bul<Rota + abvalue(Rota_hit) || Rota_bul>Rota - abvalue(Rota_hit))
-		)
-		return true;
-	else
-		return false;
-	
-	
+	//double pointdis_me_bul = pointdis(
+	//	bullet.circle.x,
+	//	bullet.circle.y,
+	//	bullet.circle.x + bullet.vx,
+	//	bullet.circle.y + bullet.vy,
+	//	rotinfo.circle.x,
+	//	rotinfo.circle.y
+	//	);
+	//double Rota = atan2(rotinfo.circle.y - bullet.circle.y, 
+	//	rotinfo.circle.x- bullet.circle.x) * 180 / PI;//子弹为原点，子弹和机甲中心所构成的角
+	//double Rota_bul = atan2(bullet.vy-rotinfo.vx, bullet.vx-rotinfo.vy) * 180 / PI;//子弹相对机甲射击方向角
+	//double dis_me_bul = sqrt(dis(bullet.circle, rotinfo.circle));
+	//double Rota_hit = atan2(
+	//	rotinfo.circle.r,
+	//	sqrt(dis_me_bul*dis_me_bul - rotinfo.circle.r*rotinfo.circle.r)
+	//	);//能击中的角度范围
+	//if (
+	//	pointdis_me_bul <= rotinfo.circle.r &&
+	//	(Rota_bul<Rota + abvalue(Rota_hit) || Rota_bul>Rota - abvalue(Rota_hit))
+	//	)
+	//	return true;
+	//else
+	//	return false;
+	double Rota_bul = atan2(bullet.vy, bullet.vx ) * 180 / PI;//子弹相对机甲射击方向角
+	AngleAdjust(Rota_bul);
+	Beam bulbeam;
+	bulbeam.x = bullet.circle.x;
+	bulbeam.y = bullet.circle.y;
+	bulbeam.rotation = Rota_bul;
+	return HitTestBeamCircle(bulbeam, rotinfo.circle);
 }
 
 double RobotAI::abvalue(double x)
@@ -436,10 +478,23 @@ double RobotAI::abvalue(double x)
 }
 
 double RobotAI::pointdis(double x1, double y1, double x2, double y2, double x3, double y3)
+//返回（x3,y3)到(x1,y1),(x2,y2)连线的距离
 {
 	double A = (y2 - y1) / (x2 - x1);
 	double B = -1.0;
 	double C = y1 - (y2 - y1)*x1 / (x2 - x1);
+	double son = A*x3 + B*y3 + C;
+	double Abvalue = son / sqrt(A*A + B*B);
+	if (Abvalue > 0)
+		return Abvalue;
+	else
+		return -Abvalue;
+}
+double pointdis(double k, double x1, double y1, double x3, double y3)
+{
+	double A = k;
+	double B = -1.0;
+	double C = y1 - k*x1;
 	double son = A*x3 + B*y3 + C;
 	double Abvalue = son / sqrt(A*A + B*B);
 	if (Abvalue > 0)
