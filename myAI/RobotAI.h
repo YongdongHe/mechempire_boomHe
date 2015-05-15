@@ -139,7 +139,7 @@ public:
 
 	/*对每个机甲适应的部分>>>>>>>*/
 
-
+	bool WillNotHit(const RobotAI_BulletInformation& bullet, const RobotAI_RobotInformation& rotinfo);//判断子弹绝对不会打到
 	bool WillHit(const RobotAI_BulletInformation& bullet, const RobotAI_RobotInformation& rotinfo);
 	double abvalue(double x);
 	double pointdis(const Circle a1, const Circle a2, const Circle a3);

@@ -34,7 +34,7 @@ void RobotAI::Update(RobotAI_Order& order,const RobotAI_BattlefieldInformation& 
 	
 	static int hp_tag = tag.hp;
 	/*静态成员列表*/
-	
+
 	
 	//开火操作
     if (frame != 0)
@@ -47,11 +47,69 @@ void RobotAI::Update(RobotAI_Order& order,const RobotAI_BattlefieldInformation& 
 	//isDodeg——判断是否执行躲避函数，如果执行则为true，将跳过后面的移动函数优先躲避
 	//bullet ——最近的子弹
 	bool isDodge = false;
-	int b_index_nearest = GetNearetBul(order, info, myID);
-	if (b_index_nearest != -1)//如果有敌方子弹则进行躲避判断
+	//int b_index_nearest = GetNearetBul(order, info, myID);
+	//if (b_index_nearest != -1)//如果有敌方子弹则进行躲避判断
+	//{
+	//	auto bullet = info.bulletInformation[b_index_nearest];
+ //       isDodge = onDodge(order, info, myID, bullet);
+	//}
+	int b_tag = 0;
+
+	for (int b_index = 0; b_index <= info.num_bullet; b_index++)
 	{
+		auto bullet = info.bulletInformation[b_index];
+		if (bullet.launcherID == myID)continue;
+		b_tag++;
+	}
+
+	if (frame < 500)
+	{
+		cout << "zhen下面" << frame << endl << "无序数组" << endl;
+		for (int b_index = 0; b_index <= info.num_bullet; b_index++)
+		{
+			auto bullet = info.bulletInformation[b_index];
+			if (bullet.launcherID == myID)continue;
+			cout << dis(info.bulletInformation[b_index].circle, me.circle) << " & ";
+		}
+		cout << endl;
+	}
+	int *bulArray = new int[b_tag];
+	int bulArray_index = 0;
+	for (int b_index = 0; b_index <= info.num_bullet; b_index++)
+	{
+		auto bullet = info.bulletInformation[b_index];
+		if (bullet.launcherID == myID)continue;
+		bulArray[bulArray_index] = b_index;
+		bulArray_index++;
+	}
+	for (int i = 0; i < bulArray_index; i++)
+	{
+		for (int j = 0; j < i; j++)
+		{
+			if (dis(info.bulletInformation[bulArray[j]].circle, me.circle) <=
+				dis(info.bulletInformation[bulArray[j + 1]].circle, me.circle))
+				continue;
+			else
+			{
+				int temp = bulArray[j + 1];
+				bulArray[j + 1] = bulArray[j];
+				bulArray[j] = temp;
+			}
+		}
+	}
+	
+	if (bulArray_index!=0)//如果有敌方子弹则进行躲避判断
+	{
+		int b_index_nearest = bulArray[0];
+		if (frame < 500)
+		{
+			cout << "有序数组" << GetNearetBul(order, info, myID) << "^" << bulArray[0] << endl;
+			for (int i = 0; i < bulArray_index; i++)
+			cout << dis(info.bulletInformation[bulArray[i]].circle, me.circle) << " & ";
+			cout << endl;
+		}
 		auto bullet = info.bulletInformation[b_index_nearest];
-        isDodge = onDodge(order, info, myID, bullet);
+	       isDodge = onDodge(order, info, myID, bullet);
 
 	}
 
@@ -64,6 +122,7 @@ void RobotAI::Update(RobotAI_Order& order,const RobotAI_BattlefieldInformation& 
 	//静态变量更新
 	hp_tag = tag.hp;
 	frame++;
+	delete bulArray;
 }
 
 
@@ -193,7 +252,7 @@ void RobotAI::onBattleEnd(const RobotAI_BattlefieldInformation& info,int myID)
 	//一场战斗结束时被调用，可能可以用来析构你动态分配的内存空间（如果你用了的话）
 	//参数：info	...	战场信息
 	//		myID	... 自己机甲在info中robot数组对应的下标
-	//system("Pause");
+	system("Pause");
 }
 
 
@@ -209,7 +268,6 @@ void RobotAI::onHit(int launcherID,bullettypename btn)
 {
 	//被子弹击中时被调用
 	//参数：btn	...	击中你的子弹种类（枚举类型）
-	
 }
 
 
@@ -256,6 +314,7 @@ int RobotAI::GetNearetBul(RobotAI_Order& order, const RobotAI_BattlefieldInforma
 		if (dis(bullet.circle, me.circle) <= dis(info.bulletInformation[b_index_near].circle, me.circle))
 			b_index_near = b_index;		
 	}
+	
 	//cout << "最近！" << b_index_near << endl;
 	return b_index_near;//如果没有找到最近的敌方子弹就返回-1
 }
@@ -394,6 +453,7 @@ bool  RobotAI::onDodge(RobotAI_Order& order, const RobotAI_BattlefieldInformatio
 	bool inHitRange = dis(bullet.circle, me.circle) <= 0.6 * me.circle.r *getBulletSpeed(bullet.type);//判断在监控范围内再躲
 	double Rota_bulv = atan2(bullet.vy, bullet.vx) * 180 / PI;//子弹速度方向
 	double Rota_bulv_ag = Rota_bulv - 180;//子弹速度反方向
+	double tag_vrota = atan2(tag.vy, tag.vx) * 180 / PI;//对方机甲移动方向
 	AngleAdjust(Rota_bulv_ag);
 	auto Type_Bul = bullet.type;
 
@@ -413,17 +473,39 @@ bool  RobotAI::onDodge(RobotAI_Order& order, const RobotAI_BattlefieldInformatio
 		case BT_Cannonball:
 		case BT_ApolloBall:
 		case BT_PlasmaBall:
-			if ((tag.remainingAmmo + 2)*getBulletDamage(bullet.type) < me.hp)
+			if ( (tag.remainingAmmo+2)*getBulletDamage(bullet.type) < me.hp)
 			{
 				onMove1(order, info, myID, tag.circle );
 				return true;
 			}
-			if (!inHitRange)return false;
+			if (!inHitRange)return false;	
+			//接近型躲避方案1
+			//AngleAdjust(tag_vrota);
+			//if (tag_vrota>me.engineRotation)
+			//{
+			//	order.eturn = 1;
+			//	order.run = 1;
+			//}
+			//else
+			//{
+			//	order.eturn = -1;
+			//	order.run = 1;
+			//}
+
+			//直接绕圈躲避方案2
 				order.eturn = 1;
 				order.run = 1;
-				return true;		
+				return true;
+			if (!WillHit(bullet, me))
+			{
+				return false;
+			}
+
+				return true;	
 			break;
+
 		default:
+			//躲低速子弹，躲避方案3
 			if (!inHitRange)
 			{
 				return false;
@@ -443,6 +525,34 @@ bool  RobotAI::onDodge(RobotAI_Order& order, const RobotAI_BattlefieldInformatio
 		break;
 		return false;
 	}
+}
+
+bool RobotAI::WillNotHit(const RobotAI_BulletInformation& bullet, const RobotAI_RobotInformation& rotinfo)
+//判断在之后短时间内绝对不可能达到的子弹
+{
+	double Rota_bul = atan2(bullet.vy, bullet.vx) * 180 / PI;//子弹射击方向角
+	AngleAdjust(Rota_bul);
+	Beam bulbeam;
+	bulbeam.x = bullet.circle.x;
+	bulbeam.y = bullet.circle.y;
+	bulbeam.rotation = Rota_bul;
+	bool HitTest=HitTestBeamCircle(bulbeam, rotinfo.circle);//碰撞测试
+
+	double Rota_engine = rotinfo.engineRotation;
+
+	double Rota_engine_downb = AnglePlus(Rota_engine, -90);
+	double Rota_engine_upb = AnglePlus(Rota_engine, 90);
+	bool vRotaTest = (Rota_bul<Rota_engine_upb && Rota_bul>Rota_engine_downb);//子弹角度测试
+
+	double dy = bullet.circle.y - rotinfo.circle.y;
+	double dx = bullet.circle.x - rotinfo.circle.x;
+	double Rota_place = atan2(dy, dx) * 180 / PI;
+	AngleAdjust(Rota_place);
+	bool pRotaTest = (Rota_place<Rota_engine_upb && Rota_place>Rota_engine_downb);
+
+	if (!HitTest&&vRotaTest&&pRotaTest)
+		return true;
+	else return false;
 }
 
 bool RobotAI::WillHit(const RobotAI_BulletInformation& bullet, const RobotAI_RobotInformation& rotinfo)
@@ -471,7 +581,7 @@ bool RobotAI::WillHit(const RobotAI_BulletInformation& bullet, const RobotAI_Rob
 	//	return true;
 	//else
 	//	return false;
-	double Rota_bul = atan2(bullet.vy, bullet.vx ) * 180 / PI;//子弹相对机甲射击方向角
+	double Rota_bul = atan2(bullet.vy, bullet.vx ) * 180 / PI;//子弹射击方向角
 	AngleAdjust(Rota_bul);
 	Beam bulbeam;
 	bulbeam.x = bullet.circle.x;
