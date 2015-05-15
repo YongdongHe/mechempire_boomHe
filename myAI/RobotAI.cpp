@@ -82,12 +82,19 @@ void RobotAI::Update(RobotAI_Order& order,const RobotAI_BattlefieldInformation& 
 		bulArray[bulArray_index] = b_index;
 		bulArray_index++;
 	}
-	for (int i = 0; i < bulArray_index; i++)
+	if (frame < 500)
 	{
-		for (int j = 0; j < i; j++)
+		cout << "未排数组" << GetNearetBul(order, info, myID) << "^" << bulArray[0] << endl;
+		for (int i = 0; i < bulArray_index; i++)
+			cout << dis(info.bulletInformation[bulArray[i]].circle, me.circle) << " & ";
+		cout << endl;
+	}
+	for (int i = bulArray_index; i > 0; i--)
+	{
+		for (int j = 0; j < bulArray_index-1; j++)
 		{
 			if (dis(info.bulletInformation[bulArray[j]].circle, me.circle) <=
-				dis(info.bulletInformation[bulArray[j + 1]].circle, me.circle))
+				dis(info.bulletInformation[bulArray[j + 1]].circle, me.circle)  )
 				continue;
 			else
 			{
@@ -96,7 +103,10 @@ void RobotAI::Update(RobotAI_Order& order,const RobotAI_BattlefieldInformation& 
 				bulArray[j] = temp;
 			}
 		}
+
 	}
+
+	
 	
 	if (bulArray_index!=0)//如果有敌方子弹则进行躲避判断
 	{
